@@ -26,14 +26,13 @@
     canvas {
       border: 2px solid lime;
       background: #222;
-      /* Force perfect square - no stretch! */
       aspect-ratio: 1 / 1;
       width: min(95vw, 70vh);
       height: min(95vw, 70vh);
       max-width: 95vw;
       max-height: 70vh;
       display: block;
-      object-fit: none; /* Prevent any distortion */
+      object-fit: none;
       touch-action: none;
     }
     h1 {
@@ -57,22 +56,43 @@
 <body>
   <div id="container">
     <h1>🪴 Guerrilla Snake</h1>
-    <p>Plants Planted: <span id="score">0</span> | Speed Level: <span id="speedLevel">1</span>/5</p>
+    <p>Plants: <span id="score">0</span> | High: <span id="highScore">0</span> | Speed: <span id="speedLevel">1</span>/5</p>
     <canvas id="game"></canvas>
-    <p>💡 Swipe or arrows to grow your urban vine!</p>
-    <div id="version">Version: 1.4 – Fixed horizontal stretch (perfect square canvas) (2026-02)</div>
+    <p>💡 Swipe/arrows: Grow vine! Faster every 5 plants!</p>
+    <div id="version">Version: 1.5 – High score + Sound effects (2026-02)</div>
   </div>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
+    const highEl = document.getElementById('highScore');
     const speedEl = document.getElementById('speedLevel');
 
     let grid;
     const GRID_SIZE = 25;
 
-    // Perfect square sizing - always uses the smaller dimension
+    let audioCtx = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playBeep(frequency, duration = 0.1, type = 'sine') {
+      if (!audioCtx) return;
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.frequency.value = frequency;
+      oscillator.type = type;
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + duration);
+    }
+
     function resizeCanvas() {
       const maxSize = Math.min(
         window.innerWidth * 0.92,
@@ -81,13 +101,10 @@
       canvas.width = maxSize;
       canvas.height = maxSize;
       grid = maxSize / GRID_SIZE;
-
-      // Clear and background
       ctx.fillStyle = '#222';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Multiple resize triggers for mobile/perfect load
     let resizeTimeout;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimeout);
@@ -98,10 +115,12 @@
       setTimeout(resizeCanvas, 50);
       setTimeout(resizeCanvas, 300);
     });
-    resizeCanvas(); // Immediate
+    resizeCanvas();
 
     let count = 0;
     let score = 0;
+    let highScore = parseInt(localStorage.getItem('guerrillaSnakeHigh') || '0');
+    highEl.textContent = highScore;
 
     let snakeHeadX = 12;
     let snakeHeadY = 12;
@@ -142,16 +161,17 @@
     }
 
     function getSpeedDelay() {
-      return 6 - getSpeedLevel(); // 5→1 (slow to fast)
+      return 6 - getSpeedLevel();
     }
 
     function updateSpeedDisplay() {
       speedEl.textContent = getSpeedLevel();
     }
 
-    // Touch controls
+    // Touch controls + init audio on first touch
     let touchStartX = 0, touchStartY = 0;
     canvas.addEventListener('touchstart', e => {
+      if (!audioCtx) initAudio();
       e.preventDefault();
       touchStartX = e.touches[0].screenX;
       touchStartY = e.touches[0].screenY;
@@ -171,8 +191,9 @@
       }
     }, { passive: false });
 
-    // Keyboard (modern keys)
+    // Keyboard + init audio
     document.addEventListener('keydown', e => {
+      if (!audioCtx) initAudio();
       if (e.key === 'ArrowLeft' && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
       else if (e.key === 'ArrowUp' && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
       else if (e.key === 'ArrowRight' && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
@@ -202,6 +223,7 @@
         scoreEl.textContent = score;
         updateSpeedDisplay();
         getNewSeed();
+        playBeep(800, 0.12); // Eat sound
       }
 
       snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
@@ -209,34 +231,45 @@
         snake.cells.pop();
       }
 
-      // Draw seed
       const seedPos = toPixel(seed.x, seed.y);
       ctx.fillStyle = 'gold';
       ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
 
-      // Draw snake + collision
       ctx.fillStyle = 'lime';
+      let gameOver = false;
       snake.cells.forEach((cell, index) => {
         const pos = toPixel(cell.x, cell.y);
         ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
 
         for (let i = index + 1; i < snake.cells.length; i++) {
           if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            // Reset
-            snakeHeadX = 12;
-            snakeHeadY = 12;
-            snake.cells = [];
-            snake.maxCells = 4;
-            snakeDX = 1;
-            snakeDY = 0;
-            score = 0;
-            scoreEl.textContent = score;
-            updateSpeedDisplay();
-            getNewSeed();
-            return;
+            gameOver = true;
+            break;
           }
         }
+        if (gameOver) break;
       });
+
+      if (gameOver) {
+        playBeep(200, 0.3, 'square'); // Death buzz
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('guerrillaSnakeHigh', highScore);
+          highEl.textContent = highScore;
+          playBeep(1000, 0.15); // New high celebration
+        }
+        // Reset
+        snakeHeadX = 12;
+        snakeHeadY = 12;
+        snake.cells = [];
+        snake.maxCells = 4;
+        snakeDX = 1;
+        snakeDY = 0;
+        score = 0;
+        scoreEl.textContent = score;
+        updateSpeedDisplay();
+        getNewSeed();
+      }
     }
 
     requestAnimationFrame(loop);
