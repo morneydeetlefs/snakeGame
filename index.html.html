@@ -42,15 +42,16 @@
 </head>
 <body>
   <h1>🪴 Guerrilla Snake</h1>
-  <p>Plants Planted: <span id="score">0</span> | Swipe or Arrows to Plant Seeds!</p>
+  <p>Plants Planted: <span id="score">0</span> | Speed Level: <span id="speedLevel">1</span>/5</p>
   <canvas id="game"></canvas>
-  <p>💡 Urban vine: Grow without getting caught!</p>
-  <div id="version">Version: 1.2 – Fixed eating with grid snapping (2026-02)</div>
+  <p>💡 Urban vine: Grow without getting caught! Faster every 5 plants!</p>
+  <div id="version">Version: 1.3 – Added progressive speed control (2026-02)</div>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
+    const speedEl = document.getElementById('speedLevel');
 
     // Declare grid early
     let grid;
@@ -109,6 +110,16 @@
       return { px: x * grid, py: y * grid };
     }
 
+    // Get current speed level and delay (1-5 levels, faster = lower delay)
+    function getSpeedLevel() {
+      return Math.min(5, Math.floor(score / 5) + 1);
+    }
+
+    function getSpeedDelay() {
+      const level = getSpeedLevel();
+      return Math.max(1, 5 - level); // Level 1: delay=4, Level 5: delay=1 (fastest)
+    }
+
     // Touch swipe controls (direction in grid steps)
     let touchStartX = 0, touchStartY = 0;
     canvas.addEventListener('touchstart', (e) => {
@@ -139,10 +150,17 @@
       else if (e.which === 40 && snakeDY === 0) { snakeDY = 1; snakeDX = 0; } // Down
     });
 
+    function updateSpeedDisplay() {
+      const level = getSpeedLevel();
+      speedEl.textContent = level;
+    }
+
     function loop() {
       requestAnimationFrame(loop);
 
-      if (++count < 4) return;
+      // Dynamic speed control
+      const delay = getSpeedDelay();
+      if (++count < delay) return;
       count = 0;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -151,59 +169,4 @@
       snakeHeadX += snakeDX;
       snakeHeadY += snakeDY;
 
-      // Wrap around edges (modulo for indices)
-      if (snakeHeadX < 0) snakeHeadX = GRID_SIZE - 1;
-      else if (snakeHeadX >= GRID_SIZE) snakeHeadX = 0;
-      if (snakeHeadY < 0) snakeHeadY = GRID_SIZE - 1;
-      else if (snakeHeadY >= GRID_SIZE) snakeHeadY = 0;
-
-      // Check eating with exact integer match
-      if (snakeHeadX === seed.x && snakeHeadY === seed.y) {
-        snake.maxCells++;
-        score++;
-        scoreEl.textContent = score;
-        getNewSeed();
-      }
-
-      // Add new head cell
-      snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
-
-      // Remove tail if not growing
-      if (snake.cells.length > snake.maxCells) {
-        snake.cells.pop();
-      }
-
-      // Draw seed
-      const seedPos = toPixel(seed.x, seed.y);
-      ctx.fillStyle = 'gold';
-      ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
-
-      // Draw snake
-      ctx.fillStyle = 'lime';
-      snake.cells.forEach((cell, index) => {
-        const pos = toPixel(cell.x, cell.y);
-        ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
-
-        // Self collision (check against later cells only)
-        for (let i = index + 1; i < snake.cells.length; i++) {
-          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            // Reset
-            snakeHeadX = 12;
-            snakeHeadY = 12;
-            snake.cells = [];
-            snake.maxCells = 4;
-            snakeDX = 1;
-            snakeDY = 0;
-            score = 0;
-            scoreEl.textContent = score;
-            getNewSeed();
-            return; // Break out of loops
-          }
-        }
-      });
-    }
-
-    requestAnimationFrame(loop);
-  </script>
-</body>
-</html>
+      //
