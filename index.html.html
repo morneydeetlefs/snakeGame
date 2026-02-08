@@ -22,7 +22,7 @@
       background: #222;
       max-width: 95vw;
       max-height: 70vh;
-      touch-action: none; /* Prevent zoom/scroll on touch */
+      touch-action: none;
     }
     h1 {
       margin: 10px 0;
@@ -33,6 +33,11 @@
       margin: 5px 0;
       text-align: center;
     }
+    #version {
+      font-size: 0.9em;
+      color: #555;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -40,143 +45,139 @@
   <p>Plants Planted: <span id="score">0</span> | Swipe or Arrows to Plant Seeds!</p>
   <canvas id="game"></canvas>
   <p>💡 Urban vine: Grow without getting caught!</p>
+  <div id="version">Version: 1.0 – 2026-02</div>
 
   <script>
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const scoreEl = document.getElementById('score');
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
 
-  // Declare grid early
-  let grid;
+    // Declare grid early
+    let grid;
 
-  // Responsive grid: Fit to screen (25x25 cells)
-  const updateCanvasSize = () => {
-    const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.6);
-    canvas.width = size;
-    canvas.height = size;
-    grid = size / 25;
-  };
-  updateCanvasSize();
-  window.addEventListener('resize', updateCanvasSize);
+    // Responsive grid: Fit to screen (25x25 cells)
+    const updateCanvasSize = () => {
+      const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.6);
+      canvas.width = size;
+      canvas.height = size;
+      grid = size / 25;
+    };
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
 
-  // Now initialize game vars AFTER grid is set
-  let count = 0;
-  let score = 0;
+    let count = 0;
+    let score = 0;
 
-  const snake = {
-    x: 12 * grid,
-    y: 12 * grid,
-    dx: grid,
-    dy: 0,
-    cells: [],
-    maxCells: 4
-  };
+    const snake = {
+      x: 12 * grid,
+      y: 12 * grid,
+      dx: grid,
+      dy: 0,
+      cells: [],
+      maxCells: 4
+    };
 
-  const seed = { x: 0, y: 0 }; // "Apple" = seed
+    const seed = { x: 0, y: 0 };
 
-  function getRandomInt(min, max) {
-    return Math.floor(Math.random() * (max - min)) + min;
-  }
-
-  function getNewSeed() {
-    seed.x = getRandomInt(0, 25) * grid;
-    seed.y = getRandomInt(0, 25) * grid;
-  }
-  getNewSeed();
-
-  // Touch swipe controls
-  let touchStartX = 0, touchStartY = 0;
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    const deltaX = e.changedTouches[0].screenX - touchStartX;
-    const deltaY = e.changedTouches[0].screenY - touchStartY;
-    const threshold = 30; // Min swipe distance
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-      if (deltaX > 0 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
-      else if (deltaX < 0 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
-    } else if (Math.abs(deltaY) > threshold) {
-      if (deltaY > 0 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
-      else if (deltaY < 0 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min)) + min;
     }
-  }, { passive: false });
 
-  // Keyboard controls
-  document.addEventListener('keydown', (e) => {
-    if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
-    else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
-    else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
-    else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
-  });
-
-  function loop() {
-  requestAnimationFrame(loop);
-
-  if (++count < 4) return;
-  count = 0;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Move the snake (new head position)
-  snake.x += snake.dx;
-  snake.y += snake.dy;
-
-  // Wrap around edges
-  if (snake.x < 0) snake.x = canvas.width - grid;
-  else if (snake.x >= canvas.width) snake.x = 0;
-  if (snake.y < 0) snake.y = canvas.height - grid;
-  else if (snake.y >= canvas.height) snake.y = 0;
-
-  // Check if head eats the seed **before** adding new cell
-  if (snake.x === seed.x && snake.y === seed.y) {
-    snake.maxCells++;
-    score++;
-    scoreEl.textContent = score;
+    function getNewSeed() {
+      seed.x = getRandomInt(0, 25) * grid;
+      seed.y = getRandomInt(0, 25) * grid;
+    }
     getNewSeed();
-  }
 
-  // Add new head
-  snake.cells.unshift({ x: snake.x, y: snake.y });
+    // Touch swipe controls
+    let touchStartX = 0, touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: false });
 
-  // Remove tail unless we just ate
-  if (snake.cells.length > snake.maxCells) {
-    snake.cells.pop();
-  }
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const deltaX = e.changedTouches[0].screenX - touchStartX;
+      const deltaY = e.changedTouches[0].screenY - touchStartY;
+      const threshold = 30;
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+        if (deltaX > 0 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+        else if (deltaX < 0 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+      } else if (Math.abs(deltaY) > threshold) {
+        if (deltaY > 0 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
+        else if (deltaY < 0 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+      }
+    }, { passive: false });
 
-  // Draw seed
-  ctx.fillStyle = 'gold';
-  ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+      else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+      else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+      else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
+    });
 
-  // Draw snake
-  ctx.fillStyle = 'lime';
-  snake.cells.forEach((cell, index) => {
-    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+    function loop() {
+      requestAnimationFrame(loop);
 
-    // Check self-collision (skip head)
-    for (let i = index + 1; i < snake.cells.length; i++) {
-      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-        // Reset game
-        snake.x = 12 * grid;
-        snake.y = 12 * grid;
-        snake.cells = [];
-        snake.maxCells = 4;
-        snake.dx = grid;
-        snake.dy = 0;
-        score = 0;
+      if (++count < 4) return;
+      count = 0;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      snake.x += snake.dx;
+      snake.y += snake.dy;
+
+      // Wrap around edges
+      if (snake.x < 0) snake.x = canvas.width - grid;
+      else if (snake.x >= canvas.width) snake.x = 0;
+      if (snake.y < 0) snake.y = canvas.height - grid;
+      else if (snake.y >= canvas.height) snake.y = 0;
+
+      // Check eating **before** adding new head
+      if (snake.x === seed.x && snake.y === seed.y) {
+        snake.maxCells++;
+        score++;
         scoreEl.textContent = score;
         getNewSeed();
-        break;
       }
-    }
-  });
-}
 
-  requestAnimationFrame(loop);
-</script>
+      snake.cells.unshift({ x: snake.x, y: snake.y });
+
+      if (snake.cells.length > snake.maxCells) {
+        snake.cells.pop();
+      }
+
+      // Draw seed
+      ctx.fillStyle = 'gold';
+      ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+
+      // Draw snake
+      ctx.fillStyle = 'lime';
+      snake.cells.forEach((cell, index) => {
+        ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+
+        // Self collision
+        for (let i = index + 1; i < snake.cells.length; i++) {
+          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+            snake.x = 12 * grid;
+            snake.y = 12 * grid;
+            snake.cells = [];
+            snake.maxCells = 4;
+            snake.dx = grid;
+            snake.dy = 0;
+            score = 0;
+            scoreEl.textContent = score;
+            getNewSeed();
+            break;
+          }
+        }
+      });
+    }
+
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
