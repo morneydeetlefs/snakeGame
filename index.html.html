@@ -15,33 +15,36 @@
       color: lime;
     }
     #container {
-      height: 100%;
+      height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px;
+      padding: 15px;
       box-sizing: border-box;
     }
     canvas {
       border: 2px solid lime;
       background: #222;
-      width: 100%;
+      /* Force perfect square - no stretch! */
+      aspect-ratio: 1 / 1;
+      width: min(95vw, 70vh);
+      height: min(95vw, 70vh);
       max-width: 95vw;
-      height: auto;
-      max-height: 65vh;
+      max-height: 70vh;
       display: block;
+      object-fit: none; /* Prevent any distortion */
       touch-action: none;
     }
     h1 {
       margin: 8px 0 4px;
-      font-size: 1.6em;
+      font-size: clamp(1.4em, 4vw, 1.8em);
       text-align: center;
     }
     p, #status {
       margin: 4px 0;
       text-align: center;
-      font-size: 0.95em;
+      font-size: clamp(0.85em, 3vw, 1em);
     }
     #version {
       font-size: 0.8em;
@@ -57,7 +60,7 @@
     <p>Plants Planted: <span id="score">0</span> | Speed Level: <span id="speedLevel">1</span>/5</p>
     <canvas id="game"></canvas>
     <p>💡 Swipe or arrows to grow your urban vine!</p>
-    <div id="version">Version: 1.3.1 – Improved canvas sizing & loading (2026-02)</div>
+    <div id="version">Version: 1.4 – Fixed horizontal stretch (perfect square canvas) (2026-02)</div>
   </div>
 
   <script>
@@ -69,31 +72,33 @@
     let grid;
     const GRID_SIZE = 25;
 
-    // Force resize on load + better sizing logic
+    // Perfect square sizing - always uses the smaller dimension
     function resizeCanvas() {
-      // Use the smaller dimension to keep square
-      const size = Math.min(
+      const maxSize = Math.min(
         window.innerWidth * 0.92,
-        window.innerHeight * 0.65
+        window.innerHeight * 0.68
       );
-      canvas.width = size;
-      canvas.height = size;
-      grid = size / GRID_SIZE;
+      canvas.width = maxSize;
+      canvas.height = maxSize;
+      grid = maxSize / GRID_SIZE;
 
-      // Redraw immediately after resize
+      // Clear and background
       ctx.fillStyle = '#222';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Call resize multiple times to catch initial load issues
-    window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('load', () => {
-      resizeCanvas();
-      setTimeout(resizeCanvas, 100);   // small delay helps on mobile
-      setTimeout(resizeCanvas, 500);
+    // Multiple resize triggers for mobile/perfect load
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resizeCanvas, 100);
     });
-    // Run once immediately
-    resizeCanvas();
+    window.addEventListener('orientationchange', resizeCanvas);
+    window.addEventListener('load', () => {
+      setTimeout(resizeCanvas, 50);
+      setTimeout(resizeCanvas, 300);
+    });
+    resizeCanvas(); // Immediate
 
     let count = 0;
     let score = 0;
@@ -102,10 +107,7 @@
     let snakeHeadY = 12;
     let snakeDX = 1;
     let snakeDY = 0;
-    const snake = {
-      cells: [],
-      maxCells: 4
-    };
+    const snake = { cells: [], maxCells: 4 };
 
     const seed = { x: 0, y: 0 };
 
@@ -135,14 +137,12 @@
       return { px: x * grid, py: y * grid };
     }
 
-    // Speed control
     function getSpeedLevel() {
       return Math.min(5, Math.floor(score / 5) + 1);
     }
 
     function getSpeedDelay() {
-      const level = getSpeedLevel();
-      return 6 - level; // 5 → 1 frame delay (slower to faster)
+      return 6 - getSpeedLevel(); // 5→1 (slow to fast)
     }
 
     function updateSpeedDisplay() {
@@ -171,11 +171,11 @@
       }
     }, { passive: false });
 
-    // Keyboard
+    // Keyboard (modern keys)
     document.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft' && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
-      else if (e.key === 'ArrowUp'   && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
-      else if (e.key === 'ArrowRight'&& snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
+      else if (e.key === 'ArrowUp' && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
+      else if (e.key === 'ArrowRight' && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
       else if (e.key === 'ArrowDown' && snakeDY === 0) { snakeDY = 1; snakeDX = 0; }
     });
 
@@ -205,15 +205,16 @@
       }
 
       snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
-
       if (snake.cells.length > snake.maxCells) {
         snake.cells.pop();
       }
 
+      // Draw seed
       const seedPos = toPixel(seed.x, seed.y);
       ctx.fillStyle = 'gold';
       ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
 
+      // Draw snake + collision
       ctx.fillStyle = 'lime';
       snake.cells.forEach((cell, index) => {
         const pos = toPixel(cell.x, cell.y);
@@ -221,6 +222,7 @@
 
         for (let i = index + 1; i < snake.cells.length; i++) {
           if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+            // Reset
             snakeHeadX = 12;
             snakeHeadY = 12;
             snake.cells = [];
