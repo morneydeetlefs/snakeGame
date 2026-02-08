@@ -42,132 +42,135 @@
   <p>💡 Urban vine: Grow without getting caught!</p>
 
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
 
-    // Responsive grid: Fit to screen (25x25 cells)
-    const updateCanvasSize = () => {
-      const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.6);
-      canvas.width = size;
-      canvas.height = size;
-      grid = size / 25;
-    };
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
+  // Declare grid early
+  let grid;
 
-    let grid = 16; // Initial grid size
-    let count = 0;
-    let score = 0;
+  // Responsive grid: Fit to screen (25x25 cells)
+  const updateCanvasSize = () => {
+    const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.6);
+    canvas.width = size;
+    canvas.height = size;
+    grid = size / 25;
+  };
+  updateCanvasSize();
+  window.addEventListener('resize', updateCanvasSize);
 
-    const snake = {
-      x: 12 * grid,
-      y: 12 * grid,
-      dx: grid,
-      dy: 0,
-      cells: [],
-      maxCells: 4
-    };
+  // Now initialize game vars AFTER grid is set
+  let count = 0;
+  let score = 0;
 
-    const seed = { x: 0, y: 0 }; // "Apple" = seed
+  const snake = {
+    x: 12 * grid,
+    y: 12 * grid,
+    dx: grid,
+    dy: 0,
+    cells: [],
+    maxCells: 4
+  };
 
-    function getRandomInt(min, max) {
-      return Math.floor(Math.random() * (max - min)) + min;
+  const seed = { x: 0, y: 0 }; // "Apple" = seed
+
+  function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min)) + min;
+  }
+
+  function getNewSeed() {
+    seed.x = getRandomInt(0, 25) * grid;
+    seed.y = getRandomInt(0, 25) * grid;
+  }
+  getNewSeed();
+
+  // Touch swipe controls
+  let touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    const deltaX = e.changedTouches[0].screenX - touchStartX;
+    const deltaY = e.changedTouches[0].screenY - touchStartY;
+    const threshold = 30; // Min swipe distance
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+      if (deltaX > 0 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
+      else if (deltaX < 0 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
+    } else if (Math.abs(deltaY) > threshold) {
+      if (deltaY > 0 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
+      else if (deltaY < 0 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
     }
+  }, { passive: false });
 
-    function getNewSeed() {
-      seed.x = getRandomInt(0, 25) * grid;
-      seed.y = getRandomInt(0, 25) * grid;
-    }
-    getNewSeed();
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
+    else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
+    else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
+    else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
+  });
 
-    // Touch swipe controls
-    let touchStartX = 0, touchStartY = 0;
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      touchStartX = e.changedTouches[0].screenX;
-      touchStartY = e.changedTouches[0].screenY;
-    }, { passive: false });
+  function loop() {
+    requestAnimationFrame(loop);
 
-    canvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      const deltaX = e.changedTouches[0].screenX - touchStartX;
-      const deltaY = e.changedTouches[0].screenY - touchStartY;
-      const threshold = 30; // Min swipe distance
-      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-        if (deltaX > 0 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
-        else if (deltaX < 0 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
-      } else if (Math.abs(deltaY) > threshold) {
-        if (deltaY > 0 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
-        else if (deltaY < 0 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
+    if (++count < 4) return;
+    count = 0;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    snake.x += snake.dx;
+    snake.y += snake.dy;
+
+    // Wrap around edges
+    if (snake.x < 0) snake.x = canvas.width - grid;
+    else if (snake.x >= canvas.width) snake.x = 0;
+    if (snake.y < 0) snake.y = canvas.height - grid;
+    else if (snake.y >= canvas.height) snake.y = 0;
+
+    snake.cells.unshift({ x: snake.x, y: snake.y });
+    if (snake.cells.length > snake.maxCells) snake.cells.pop();
+
+    // Draw seed (gold)
+    ctx.fillStyle = 'gold';
+    ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+
+    // Draw snake (lime vine)
+    ctx.fillStyle = 'lime';
+    snake.cells.forEach((cell, index) => {
+      ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+
+      // Eat seed
+      if (cell.x === seed.x && cell.y === seed.y) {
+        snake.maxCells++;
+        score++;
+        scoreEl.textContent = score;
+        getNewSeed();
       }
-    }, { passive: false });
 
-    // Keyboard controls
-    document.addEventListener('keydown', (e) => {
-      if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } // Left
-      else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; } // Up
-      else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; } // Right
-      else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; } // Down
-    });
-
-    function loop() {
-      requestAnimationFrame(loop);
-
-      if (++count < 4) return;
-      count = 0;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      snake.x += snake.dx;
-      snake.y += snake.dy;
-
-      // Wrap around edges
-      if (snake.x < 0) snake.x = canvas.width - grid;
-      else if (snake.x >= canvas.width) snake.x = 0;
-      if (snake.y < 0) snake.y = canvas.height - grid;
-      else if (snake.y >= canvas.height) snake.y = 0;
-
-      snake.cells.unshift({ x: snake.x, y: snake.y });
-      if (snake.cells.length > snake.maxCells) snake.cells.pop();
-
-      // Draw seed (gold)
-      ctx.fillStyle = 'gold';
-      ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
-
-      // Draw snake (lime vine)
-      ctx.fillStyle = 'lime';
-      snake.cells.forEach((cell, index) => {
-        ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
-
-        // Eat seed
-        if (cell.x === seed.x && cell.y === seed.y) {
-          snake.maxCells++;
-          score++;
+      // Collision with self
+      for (let i = index + 1; i < snake.cells.length; i++) {
+        if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+          // Reset (using current grid)
+          snake.x = 12 * grid;
+          snake.y = 12 * grid;
+          snake.cells = [];
+          snake.maxCells = 4;
+          snake.dx = grid;
+          snake.dy = 0;
+          score = 0;
           scoreEl.textContent = score;
           getNewSeed();
+          break;
         }
+      }
+    });
+  }
 
-        // Collision with self
-        for (let i = index + 1; i < snake.cells.length; i++) {
-          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            // Reset
-            snake.x = 12 * grid;
-            snake.y = 12 * grid;
-            snake.cells = [];
-            snake.maxCells = 4;
-            snake.dx = grid;
-            snake.dy = 0;
-            score = 0;
-            scoreEl.textContent = score;
-            getNewSeed();
-            break;
-          }
-        }
-      });
-    }
-
-    requestAnimationFrame(loop);
-  </script>
+  requestAnimationFrame(loop);
+</script>
 </body>
 </html>
