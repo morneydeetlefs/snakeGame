@@ -53,11 +53,9 @@
     }
     #startOverlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.9);
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -69,14 +67,8 @@
       padding: 20px;
       box-sizing: border-box;
     }
-    #startOverlay h2 {
-      margin: 0 0 20px;
-      font-size: 1.4em;
-    }
-    #startOverlay p {
-      margin: 0 0 30px;
-      opacity: 0.8;
-    }
+    #startOverlay h2 { margin: 0 0 20px; font-size: 1.4em; }
+    #startOverlay p { margin: 0 0 30px; opacity: 0.8; }
   </style>
 </head>
 <body>
@@ -84,13 +76,13 @@
     <h1>🪴 Guerrilla Snake</h1>
     <p>Plants: <span id="score">0</span> | High: <span id="highScore">0</span> | Speed: <span id="speedLevel">1</span>/8</p>
     <canvas id="game"></canvas>
-    <p>💡 Swipe/arrows: Grow vine! Faster as you grow longer!</p>
-    <div id="version">Version: 1.6 – Stationary start + popup + finer grid + length-based speed (2026-02)</div>
+    <p>💡 Grow your vine — avoid the concrete obstacles!</p>
+    <div id="version">Version: 1.7 – Added guerrilla concrete obstacles (2026-02)</div>
   </div>
 
   <div id="startOverlay">
-    <h2>🪴 Ready to Plant?</h2>
-    <p>Swipe or tap a direction to start growing your urban vine!</p>
+    <h2>🪴 Ready to Guerrilla Garden?</h2>
+    <p>Swipe or tap a direction to start planting your urban vine!<br>Avoid the red concrete blocks!</p>
   </div>
 
   <script>
@@ -102,7 +94,7 @@
     const overlay = document.getElementById('startOverlay');
 
     let grid;
-    const GRID_SIZE = 40; // Finer grid: smaller cells, more precise
+    const GRID_SIZE = 40;
 
     let audioCtx = null;
 
@@ -111,25 +103,22 @@
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    function playBeep(frequency, duration = 0.1, type = 'sine') {
+    function playBeep(freq, duration = 0.1, type = 'sine') {
       if (!audioCtx) return;
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.frequency.value = frequency;
-      oscillator.type = type;
-      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + duration);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = freq;
+      osc.type = type;
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
     }
 
     function resizeCanvas() {
-      const maxSize = Math.min(
-        window.innerWidth * 0.92,
-        window.innerHeight * 0.68
-      );
+      const maxSize = Math.min(window.innerWidth * 0.92, window.innerHeight * 0.68);
       canvas.width = maxSize;
       canvas.height = maxSize;
       grid = maxSize / GRID_SIZE;
@@ -138,15 +127,9 @@
     }
 
     let resizeTimeout;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resizeCanvas, 100);
-    });
+    window.addEventListener('resize', () => { clearTimeout(resizeTimeout); resizeTimeout = setTimeout(resizeCanvas, 100); });
     window.addEventListener('orientationchange', resizeCanvas);
-    window.addEventListener('load', () => {
-      setTimeout(resizeCanvas, 50);
-      setTimeout(resizeCanvas, 300);
-    });
+    window.addEventListener('load', () => { setTimeout(resizeCanvas, 50); setTimeout(resizeCanvas, 300); });
     resizeCanvas();
 
     let count = 0;
@@ -154,78 +137,92 @@
     let highScore = parseInt(localStorage.getItem('guerrillaSnakeHigh') || '0');
     highEl.textContent = highScore;
 
-    // Game state
     let gameStarted = false;
 
-    // Center start position
     const startX = Math.floor(GRID_SIZE / 2);
     const startY = Math.floor(GRID_SIZE / 2);
     let snakeHeadX = startX;
     let snakeHeadY = startY;
-    let snakeDX = 0; // Stationary start
+    let snakeDX = 0;
     let snakeDY = 0;
-    const snake = { cells: [{x: startX, y: startY}], maxCells: 1 }; // Start with 1 cell
+    const snake = { cells: [{x: startX, y: startY}], maxCells: 1 };
 
     const seed = { x: 0, y: 0 };
+    let obstacles = []; // array of {x, y}
 
     function getRandomInt(min, max) {
       return Math.floor(Math.random() * (max - min)) + min;
     }
 
+    function positionIsFree(x, y) {
+      // Check snake
+      for (let cell of snake.cells) {
+        if (cell.x === x && cell.y === y) return false;
+      }
+      // Check seed
+      if (x === seed.x && y === seed.y) return false;
+      // Check other obstacles
+      for (let obs of obstacles) {
+        if (obs.x === x && obs.y === y) return false;
+      }
+      return true;
+    }
+
     function getNewSeed() {
       seed.x = getRandomInt(0, GRID_SIZE);
       seed.y = getRandomInt(0, GRID_SIZE);
-      let valid = false;
-      while (!valid) {
-        valid = true;
-        for (let cell of snake.cells) {
-          if (seed.x === cell.x && seed.y === cell.y) {
-            valid = false;
-            seed.x = getRandomInt(0, GRID_SIZE);
-            seed.y = getRandomInt(0, GRID_SIZE);
-            break;
-          }
-        }
+      while (!positionIsFree(seed.x, seed.y)) {
+        seed.x = getRandomInt(0, GRID_SIZE);
+        seed.y = getRandomInt(0, GRID_SIZE);
       }
     }
     getNewSeed();
+
+    function addObstacles() {
+      const targetCount = Math.floor(score / 5) + 1; // +1 every 5 plants
+      while (obstacles.length < targetCount) {
+        const x = getRandomInt(0, GRID_SIZE);
+        const y = getRandomInt(0, GRID_SIZE);
+        if (positionIsFree(x, y)) {
+          obstacles.push({x, y});
+        }
+      }
+    }
 
     function toPixel(x, y) {
       return { px: x * grid, py: y * grid };
     }
 
-    // Speed based on snake length (slower start, faster as grows)
     function getSpeedLevel() {
       return Math.min(8, Math.floor((snake.maxCells - 1) / 2) + 1);
     }
 
     function getSpeedDelay() {
       const level = getSpeedLevel();
-      return Math.max(3, 12 - level); // Start slow (delay=11 at len=1), max fast (delay=3 at high len)
+      return Math.max(3, 12 - level);
     }
 
     function updateSpeedDisplay() {
       speedEl.textContent = getSpeedLevel();
     }
 
-    // Input handlers - start game on first input
     function handleDirection(dx, dy) {
       if (!gameStarted) {
         gameStarted = true;
         overlay.style.display = 'none';
         snakeDX = dx;
         snakeDY = dy;
-        playBeep(600, 0.2); // Start sound
+        playBeep(600, 0.2);
         updateSpeedDisplay();
         return;
       }
-      // Prevent reverse direction
-      if ((dx === -snakeDX && dy === -snakeDY) || (dx === 0 && dy === 0)) return;
+      // Prevent 180° turn
+      if (dx === -snakeDX && dy === -snakeDY) return;
       snakeDX = dx;
       snakeDY = dy;
     }
 
-    // Touch
+    // Touch controls
     let touchStartX = 0, touchStartY = 0;
     canvas.addEventListener('touchstart', e => {
       if (!audioCtx) initAudio();
@@ -258,10 +255,8 @@
     function loop() {
       requestAnimationFrame(loop);
 
-      // Only update if game started and moving
       if (!gameStarted || (snakeDX === 0 && snakeDY === 0)) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Draw stationary snake head
         ctx.fillStyle = 'lime';
         const headPos = toPixel(snakeHeadX, snakeHeadY);
         ctx.fillRect(headPos.px, headPos.py, grid - 1, grid - 1);
@@ -288,6 +283,7 @@
         scoreEl.textContent = score;
         updateSpeedDisplay();
         getNewSeed();
+        addObstacles(); // Add more obstacles as score increases
         playBeep(800, 0.12);
       }
 
@@ -296,8 +292,10 @@
         snake.cells.pop();
       }
 
-      // Collision check
+      // Collision: self + obstacles
       let gameOver = false;
+
+      // Self collision
       for (let i = 0; i < snake.cells.length; i++) {
         const cell = snake.cells[i];
         for (let j = i + 1; j < snake.cells.length; j++) {
@@ -309,8 +307,27 @@
         if (gameOver) break;
       }
 
-      // Draw
+      // Obstacle collision (head only)
+      for (let obs of obstacles) {
+        if (snakeHeadX === obs.x && snakeHeadY === obs.y) {
+          gameOver = true;
+          playBeep(150, 0.25, 'square'); // harsh hit sound
+          break;
+        }
+      }
+
+      // Draw everything
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Obstacles (red concrete)
+      ctx.fillStyle = '#c0392b';
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = Math.max(1, grid * 0.08);
+      for (let obs of obstacles) {
+        const pos = toPixel(obs.x, obs.y);
+        ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
+        ctx.strokeRect(pos.px, pos.py, grid - 1, grid - 1);
+      }
 
       // Seed
       const seedPos = toPixel(seed.x, seed.y);
@@ -324,16 +341,17 @@
         ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
       });
 
-      // Game over
+      // Game over handling
       if (gameOver) {
-        playBeep(200, 0.3, 'square');
         if (score > highScore) {
           highScore = score;
           localStorage.setItem('guerrillaSnakeHigh', highScore);
           highEl.textContent = highScore;
           playBeep(1000, 0.15);
         }
-        // Reset to stationary
+        playBeep(200, 0.3, 'square');
+
+        // Reset
         gameStarted = false;
         overlay.style.display = 'flex';
         snakeHeadX = startX;
@@ -345,6 +363,7 @@
         score = 0;
         scoreEl.textContent = score;
         updateSpeedDisplay();
+        obstacles = []; // Clear obstacles on reset
         getNewSeed();
       }
     }
