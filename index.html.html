@@ -115,60 +115,66 @@
   });
 
   function loop() {
-    requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
 
-    if (++count < 4) return;
-    count = 0;
+  if (++count < 4) return;
+  count = 0;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    snake.x += snake.dx;
-    snake.y += snake.dy;
+  // Move the snake (new head position)
+  snake.x += snake.dx;
+  snake.y += snake.dy;
 
-    // Wrap around edges
-    if (snake.x < 0) snake.x = canvas.width - grid;
-    else if (snake.x >= canvas.width) snake.x = 0;
-    if (snake.y < 0) snake.y = canvas.height - grid;
-    else if (snake.y >= canvas.height) snake.y = 0;
+  // Wrap around edges
+  if (snake.x < 0) snake.x = canvas.width - grid;
+  else if (snake.x >= canvas.width) snake.x = 0;
+  if (snake.y < 0) snake.y = canvas.height - grid;
+  else if (snake.y >= canvas.height) snake.y = 0;
 
-    snake.cells.unshift({ x: snake.x, y: snake.y });
-    if (snake.cells.length > snake.maxCells) snake.cells.pop();
+  // Check if head eats the seed **before** adding new cell
+  if (snake.x === seed.x && snake.y === seed.y) {
+    snake.maxCells++;
+    score++;
+    scoreEl.textContent = score;
+    getNewSeed();
+  }
 
-    // Draw seed (gold)
-    ctx.fillStyle = 'gold';
-    ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+  // Add new head
+  snake.cells.unshift({ x: snake.x, y: snake.y });
 
-    // Draw snake (lime vine)
-    ctx.fillStyle = 'lime';
-    snake.cells.forEach((cell, index) => {
-      ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+  // Remove tail unless we just ate
+  if (snake.cells.length > snake.maxCells) {
+    snake.cells.pop();
+  }
 
-      // Eat seed
-      if (cell.x === seed.x && cell.y === seed.y) {
-        snake.maxCells++;
-        score++;
+  // Draw seed
+  ctx.fillStyle = 'gold';
+  ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+
+  // Draw snake
+  ctx.fillStyle = 'lime';
+  snake.cells.forEach((cell, index) => {
+    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+
+    // Check self-collision (skip head)
+    for (let i = index + 1; i < snake.cells.length; i++) {
+      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+        // Reset game
+        snake.x = 12 * grid;
+        snake.y = 12 * grid;
+        snake.cells = [];
+        snake.maxCells = 4;
+        snake.dx = grid;
+        snake.dy = 0;
+        score = 0;
         scoreEl.textContent = score;
         getNewSeed();
+        break;
       }
-
-      // Collision with self
-      for (let i = index + 1; i < snake.cells.length; i++) {
-        if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-          // Reset (using current grid)
-          snake.x = 12 * grid;
-          snake.y = 12 * grid;
-          snake.cells = [];
-          snake.maxCells = 4;
-          snake.dx = grid;
-          snake.dy = 0;
-          score = 0;
-          scoreEl.textContent = score;
-          getNewSeed();
-          break;
-        }
-      }
-    });
-  }
+    }
+  });
+}
 
   requestAnimationFrame(loop);
 </script>
