@@ -45,7 +45,7 @@
   <p>Plants Planted: <span id="score">0</span> | Swipe or Arrows to Plant Seeds!</p>
   <canvas id="game"></canvas>
   <p>💡 Urban vine: Grow without getting caught!</p>
-  <div id="version">Version: 1.0 – 2026-02</div>
+  <div id="version">Version: 1.2 – Fixed eating with grid snapping (2026-02)</div>
 
   <script>
     const canvas = document.getElementById('game');
@@ -68,28 +68,48 @@
     let count = 0;
     let score = 0;
 
+    // Use integer grid indices (0-24) for snake/seed to avoid float precision issues
+    const GRID_SIZE = 25; // 25x25 grid
+    let snakeHeadX = 12; // Integer index
+    let snakeHeadY = 12;
+    let snakeDX = 1;     // Direction in grid steps
+    let snakeDY = 0;
     const snake = {
-      x: 12 * grid,
-      y: 12 * grid,
-      dx: grid,
-      dy: 0,
-      cells: [],
+      cells: [],           // Array of {x: int, y: int}
       maxCells: 4
     };
 
-    const seed = { x: 0, y: 0 };
+    const seed = { x: 0, y: 0 }; // Integer indices
 
     function getRandomInt(min, max) {
       return Math.floor(Math.random() * (max - min)) + min;
     }
 
     function getNewSeed() {
-      seed.x = getRandomInt(0, 25) * grid;
-      seed.y = getRandomInt(0, 25) * grid;
+      seed.x = getRandomInt(0, GRID_SIZE);
+      seed.y = getRandomInt(0, GRID_SIZE);
+      // Avoid spawning on snake (simple check)
+      let valid = false;
+      while (!valid) {
+        valid = true;
+        for (let cell of snake.cells) {
+          if (seed.x === cell.x && seed.y === cell.y) {
+            valid = false;
+            seed.x = getRandomInt(0, GRID_SIZE);
+            seed.y = getRandomInt(0, GRID_SIZE);
+            break;
+          }
+        }
+      }
     }
     getNewSeed();
 
-    // Touch swipe controls
+    // Convert index to pixel position
+    function toPixel(x, y) {
+      return { px: x * grid, py: y * grid };
+    }
+
+    // Touch swipe controls (direction in grid steps)
     let touchStartX = 0, touchStartY = 0;
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -103,20 +123,20 @@
       const deltaY = e.changedTouches[0].screenY - touchStartY;
       const threshold = 30;
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-        if (deltaX > 0 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
-        else if (deltaX < 0 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+        if (deltaX > 0 && snakeDX === 0) { snakeDX = 1; snakeDY = 0; } // Right
+        else if (deltaX < 0 && snakeDX === 0) { snakeDX = -1; snakeDY = 0; } // Left
       } else if (Math.abs(deltaY) > threshold) {
-        if (deltaY > 0 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
-        else if (deltaY < 0 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+        if (deltaY > 0 && snakeDY === 0) { snakeDY = 1; snakeDX = 0; } // Down
+        else if (deltaY < 0 && snakeDY === 0) { snakeDY = -1; snakeDX = 0; } // Up
       }
     }, { passive: false });
 
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
-      if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
-      else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
-      else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
-      else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
+      if (e.which === 37 && snakeDX === 0) { snakeDX = -1; snakeDY = 0; } // Left
+      else if (e.which === 38 && snakeDY === 0) { snakeDY = -1; snakeDX = 0; } // Up
+      else if (e.which === 39 && snakeDX === 0) { snakeDX = 1; snakeDY = 0; } // Right
+      else if (e.which === 40 && snakeDY === 0) { snakeDY = 1; snakeDX = 0; } // Down
     });
 
     function loop() {
@@ -127,51 +147,57 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      snake.x += snake.dx;
-      snake.y += snake.dy;
+      // Move head in grid indices
+      snakeHeadX += snakeDX;
+      snakeHeadY += snakeDY;
 
-      // Wrap around edges
-      if (snake.x < 0) snake.x = canvas.width - grid;
-      else if (snake.x >= canvas.width) snake.x = 0;
-      if (snake.y < 0) snake.y = canvas.height - grid;
-      else if (snake.y >= canvas.height) snake.y = 0;
+      // Wrap around edges (modulo for indices)
+      if (snakeHeadX < 0) snakeHeadX = GRID_SIZE - 1;
+      else if (snakeHeadX >= GRID_SIZE) snakeHeadX = 0;
+      if (snakeHeadY < 0) snakeHeadY = GRID_SIZE - 1;
+      else if (snakeHeadY >= GRID_SIZE) snakeHeadY = 0;
 
-      // Check eating **before** adding new head
-      if (snake.x === seed.x && snake.y === seed.y) {
+      // Check eating with exact integer match
+      if (snakeHeadX === seed.x && snakeHeadY === seed.y) {
         snake.maxCells++;
         score++;
         scoreEl.textContent = score;
         getNewSeed();
       }
 
-      snake.cells.unshift({ x: snake.x, y: snake.y });
+      // Add new head cell
+      snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
 
+      // Remove tail if not growing
       if (snake.cells.length > snake.maxCells) {
         snake.cells.pop();
       }
 
       // Draw seed
+      const seedPos = toPixel(seed.x, seed.y);
       ctx.fillStyle = 'gold';
-      ctx.fillRect(seed.x, seed.y, grid - 1, grid - 1);
+      ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
 
       // Draw snake
       ctx.fillStyle = 'lime';
       snake.cells.forEach((cell, index) => {
-        ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+        const pos = toPixel(cell.x, cell.y);
+        ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
 
-        // Self collision
+        // Self collision (check against later cells only)
         for (let i = index + 1; i < snake.cells.length; i++) {
           if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            snake.x = 12 * grid;
-            snake.y = 12 * grid;
+            // Reset
+            snakeHeadX = 12;
+            snakeHeadY = 12;
             snake.cells = [];
             snake.maxCells = 4;
-            snake.dx = grid;
-            snake.dy = 0;
+            snakeDX = 1;
+            snakeDY = 0;
             score = 0;
             scoreEl.textContent = score;
             getNewSeed();
-            break;
+            return; // Break out of loops
           }
         }
       });
