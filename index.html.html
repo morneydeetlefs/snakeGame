@@ -59,220 +59,233 @@
     <p>Plants: <span id="score">0</span> | High: <span id="highScore">0</span> | Speed: <span id="speedLevel">1</span>/5</p>
     <canvas id="game"></canvas>
     <p>💡 Swipe/arrows: Grow vine! Faster every 5 plants!</p>
-    <div id="version">Version: 1.5 – High score + Sound effects (2026-02)</div>
+    <div id="version">Version: 1.5.1 – High score + Sound effects - fix error(2026-02)</div>
   </div>
 
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
-    const highEl = document.getElementById('highScore');
-    const speedEl = document.getElementById('speedLevel');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const highEl = document.getElementById('highScore');
+  const speedEl = document.getElementById('speedLevel');
 
-    let grid;
-    const GRID_SIZE = 25;
+  let grid;
+  const GRID_SIZE = 25;
 
-    let audioCtx = null;
+  let audioCtx = null;
 
-    function initAudio() {
-      if (audioCtx) return;
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+  function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
 
-    function playBeep(frequency, duration = 0.1, type = 'sine') {
-      if (!audioCtx) return;
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.frequency.value = frequency;
-      oscillator.type = type;
-      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + duration);
-    }
+  function playBeep(frequency, duration = 0.1, type = 'sine') {
+    if (!audioCtx) return;
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + duration);
+  }
 
-    function resizeCanvas() {
-      const maxSize = Math.min(
-        window.innerWidth * 0.92,
-        window.innerHeight * 0.68
-      );
-      canvas.width = maxSize;
-      canvas.height = maxSize;
-      grid = maxSize / GRID_SIZE;
-      ctx.fillStyle = '#222';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+  function resizeCanvas() {
+    const maxSize = Math.min(
+      window.innerWidth * 0.92,
+      window.innerHeight * 0.68
+    );
+    canvas.width = maxSize;
+    canvas.height = maxSize;
+    grid = maxSize / GRID_SIZE;
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
-    let resizeTimeout;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resizeCanvas, 100);
-    });
-    window.addEventListener('orientationchange', resizeCanvas);
-    window.addEventListener('load', () => {
-      setTimeout(resizeCanvas, 50);
-      setTimeout(resizeCanvas, 300);
-    });
-    resizeCanvas();
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(resizeCanvas, 100);
+  });
+  window.addEventListener('orientationchange', resizeCanvas);
+  window.addEventListener('load', () => {
+    setTimeout(resizeCanvas, 50);
+    setTimeout(resizeCanvas, 300);
+  });
+  resizeCanvas();
 
-    let count = 0;
-    let score = 0;
-    let highScore = parseInt(localStorage.getItem('guerrillaSnakeHigh') || '0');
-    highEl.textContent = highScore;
+  let count = 0;
+  let score = 0;
+  let highScore = parseInt(localStorage.getItem('guerrillaSnakeHigh') || '0');
+  highEl.textContent = highScore;
 
-    let snakeHeadX = 12;
-    let snakeHeadY = 12;
-    let snakeDX = 1;
-    let snakeDY = 0;
-    const snake = { cells: [], maxCells: 4 };
+  let snakeHeadX = 12;
+  let snakeHeadY = 12;
+  let snakeDX = 1;
+  let snakeDY = 0;
+  const snake = { cells: [], maxCells: 4 };
 
-    const seed = { x: 0, y: 0 };
+  const seed = { x: 0, y: 0 };
 
-    function getRandomInt(min, max) {
-      return Math.floor(Math.random() * (max - min)) + min;
-    }
+  function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min)) + min;
+  }
 
-    function getNewSeed() {
-      seed.x = getRandomInt(0, GRID_SIZE);
-      seed.y = getRandomInt(0, GRID_SIZE);
-      let valid = false;
-      while (!valid) {
-        valid = true;
-        for (let cell of snake.cells) {
-          if (seed.x === cell.x && seed.y === cell.y) {
-            valid = false;
-            seed.x = getRandomInt(0, GRID_SIZE);
-            seed.y = getRandomInt(0, GRID_SIZE);
-            break;
-          }
+  function getNewSeed() {
+    seed.x = getRandomInt(0, GRID_SIZE);
+    seed.y = getRandomInt(0, GRID_SIZE);
+    let valid = false;
+    while (!valid) {
+      valid = true;
+      for (let cell of snake.cells) {
+        if (seed.x === cell.x && seed.y === cell.y) {
+          valid = false;
+          seed.x = getRandomInt(0, GRID_SIZE);
+          seed.y = getRandomInt(0, GRID_SIZE);
+          break;
         }
       }
     }
-    getNewSeed();
+  }
+  getNewSeed();
 
-    function toPixel(x, y) {
-      return { px: x * grid, py: y * grid };
+  function toPixel(x, y) {
+    return { px: x * grid, py: y * grid };
+  }
+
+  function getSpeedLevel() {
+    return Math.min(5, Math.floor(score / 5) + 1);
+  }
+
+  function getSpeedDelay() {
+    return 6 - getSpeedLevel();
+  }
+
+  function updateSpeedDisplay() {
+    speedEl.textContent = getSpeedLevel();
+  }
+
+  // Touch controls
+  let touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', e => {
+    if (!audioCtx) initAudio();
+    e.preventDefault();
+    touchStartX = e.touches[0].screenX;
+    touchStartY = e.touches[0].screenY;
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const deltaX = e.changedTouches[0].screenX - touchStartX;
+    const deltaY = e.changedTouches[0].screenY - touchStartY;
+    const threshold = 40;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+      if (deltaX > 0 && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
+      else if (deltaX < 0 && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
+    } else if (Math.abs(deltaY) > threshold) {
+      if (deltaY > 0 && snakeDY === 0) { snakeDY = 1; snakeDX = 0; }
+      else if (deltaY < 0 && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
     }
+  }, { passive: false });
 
-    function getSpeedLevel() {
-      return Math.min(5, Math.floor(score / 5) + 1);
-    }
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (!audioCtx) initAudio();
+    if (e.key === 'ArrowLeft' && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
+    else if (e.key === 'ArrowUp' && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
+    else if (e.key === 'ArrowRight' && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
+    else if (e.key === 'ArrowDown' && snakeDY === 0) { snakeDY = 1; snakeDX = 0; }
+  });
 
-    function getSpeedDelay() {
-      return 6 - getSpeedLevel();
-    }
-
-    function updateSpeedDisplay() {
-      speedEl.textContent = getSpeedLevel();
-    }
-
-    // Touch controls + init audio on first touch
-    let touchStartX = 0, touchStartY = 0;
-    canvas.addEventListener('touchstart', e => {
-      if (!audioCtx) initAudio();
-      e.preventDefault();
-      touchStartX = e.touches[0].screenX;
-      touchStartY = e.touches[0].screenY;
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', e => {
-      e.preventDefault();
-      const deltaX = e.changedTouches[0].screenX - touchStartX;
-      const deltaY = e.changedTouches[0].screenY - touchStartY;
-      const threshold = 40;
-      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-        if (deltaX > 0 && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
-        else if (deltaX < 0 && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
-      } else if (Math.abs(deltaY) > threshold) {
-        if (deltaY > 0 && snakeDY === 0) { snakeDY = 1; snakeDX = 0; }
-        else if (deltaY < 0 && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
-      }
-    }, { passive: false });
-
-    // Keyboard + init audio
-    document.addEventListener('keydown', e => {
-      if (!audioCtx) initAudio();
-      if (e.key === 'ArrowLeft' && snakeDX === 0) { snakeDX = -1; snakeDY = 0; }
-      else if (e.key === 'ArrowUp' && snakeDY === 0) { snakeDY = -1; snakeDX = 0; }
-      else if (e.key === 'ArrowRight' && snakeDX === 0) { snakeDX = 1; snakeDY = 0; }
-      else if (e.key === 'ArrowDown' && snakeDY === 0) { snakeDY = 1; snakeDX = 0; }
-    });
-
-    function loop() {
-      requestAnimationFrame(loop);
-
-      const delay = getSpeedDelay();
-      if (++count < delay) return;
-      count = 0;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      snakeHeadX += snakeDX;
-      snakeHeadY += snakeDY;
-
-      if (snakeHeadX < 0) snakeHeadX = GRID_SIZE - 1;
-      else if (snakeHeadX >= GRID_SIZE) snakeHeadX = 0;
-      if (snakeHeadY < 0) snakeHeadY = GRID_SIZE - 1;
-      else if (snakeHeadY >= GRID_SIZE) snakeHeadY = 0;
-
-      if (snakeHeadX === seed.x && snakeHeadY === seed.y) {
-        snake.maxCells++;
-        score++;
-        scoreEl.textContent = score;
-        updateSpeedDisplay();
-        getNewSeed();
-        playBeep(800, 0.12); // Eat sound
-      }
-
-      snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
-      if (snake.cells.length > snake.maxCells) {
-        snake.cells.pop();
-      }
-
-      const seedPos = toPixel(seed.x, seed.y);
-      ctx.fillStyle = 'gold';
-      ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
-
-      ctx.fillStyle = 'lime';
-      let gameOver = false;
-      snake.cells.forEach((cell, index) => {
-        const pos = toPixel(cell.x, cell.y);
-        ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
-
-        for (let i = index + 1; i < snake.cells.length; i++) {
-          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            gameOver = true;
-            break;
-          }
-        }
-        if (gameOver) break;
-      });
-
-      if (gameOver) {
-        playBeep(200, 0.3, 'square'); // Death buzz
-        if (score > highScore) {
-          highScore = score;
-          localStorage.setItem('guerrillaSnakeHigh', highScore);
-          highEl.textContent = highScore;
-          playBeep(1000, 0.15); // New high celebration
-        }
-        // Reset
-        snakeHeadX = 12;
-        snakeHeadY = 12;
-        snake.cells = [];
-        snake.maxCells = 4;
-        snakeDX = 1;
-        snakeDY = 0;
-        score = 0;
-        scoreEl.textContent = score;
-        updateSpeedDisplay();
-        getNewSeed();
-      }
-    }
-
+  function loop() {
     requestAnimationFrame(loop);
-  </script>
+
+    const delay = getSpeedDelay();
+    if (++count < delay) return;
+    count = 0;
+
+    // Move
+    snakeHeadX += snakeDX;
+    snakeHeadY += snakeDY;
+
+    if (snakeHeadX < 0) snakeHeadX = GRID_SIZE - 1;
+    else if (snakeHeadX >= GRID_SIZE) snakeHeadX = 0;
+    if (snakeHeadY < 0) snakeHeadY = GRID_SIZE - 1;
+    else if (snakeHeadY >= GRID_SIZE) snakeHeadY = 0;
+
+    // Eat
+    if (snakeHeadX === seed.x && snakeHeadY === seed.y) {
+      snake.maxCells++;
+      score++;
+      scoreEl.textContent = score;
+      updateSpeedDisplay();
+      getNewSeed();
+      playBeep(800, 0.12);
+    }
+
+    // Add new head
+    snake.cells.unshift({ x: snakeHeadX, y: snakeHeadY });
+
+    // Remove tail if not growing
+    if (snake.cells.length > snake.maxCells) {
+      snake.cells.pop();
+    }
+
+    // Check collision (separate from drawing)
+    let gameOver = false;
+    for (let i = 0; i < snake.cells.length; i++) {
+      const cell = snake.cells[i];
+      for (let j = i + 1; j < snake.cells.length; j++) {
+        if (cell.x === snake.cells[j].x && cell.y === snake.cells[j].y) {
+          gameOver = true;
+          break;
+        }
+      }
+      if (gameOver) break;
+    }
+
+    // Clear & draw
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Seed
+    const seedPos = toPixel(seed.x, seed.y);
+    ctx.fillStyle = 'gold';
+    ctx.fillRect(seedPos.px, seedPos.py, grid - 1, grid - 1);
+
+    // Snake
+    ctx.fillStyle = 'lime';
+    snake.cells.forEach(cell => {
+      const pos = toPixel(cell.x, cell.y);
+      ctx.fillRect(pos.px, pos.py, grid - 1, grid - 1);
+    });
+
+    // Handle game over
+    if (gameOver) {
+      playBeep(200, 0.3, 'square');
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('guerrillaSnakeHigh', highScore);
+        highEl.textContent = highScore;
+        playBeep(1000, 0.15);
+      }
+      // Reset
+      snakeHeadX = 12;
+      snakeHeadY = 12;
+      snake.cells = [];
+      snake.maxCells = 4;
+      snakeDX = 1;
+      snakeDY = 0;
+      score = 0;
+      scoreEl.textContent = score;
+      updateSpeedDisplay();
+      getNewSeed();
+    }
+  }
+
+  requestAnimationFrame(loop);
+</script>
 </body>
 </html>
